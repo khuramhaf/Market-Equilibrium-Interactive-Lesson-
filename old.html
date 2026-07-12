@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Market Equilibrium Lesson</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --text-main: #1f2937;
+            --bg-light: #f3f4f6;
+            --surplus-color: #dc2626;
+            --shortage-color: #0284c7;
+            --equilibrium-color: #16a34a;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: var(--text-main);
+            background-color: #fafafa;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        /* Master Grid Split Layout matched from demand.html */
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr; 
+            gap: 25px;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
+        }
+
+        .interactive-section {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        /* Cleaned, Simplified Lesson Container from demand.html */
+        .lesson-text-section {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-light);
+            padding: 24px;
+            border-left: 5px solid var(--primary);
+            border-radius: 6px;
+            height: fit-content;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            margin-top: 0;
+            color: #111827;
+        }
+
+        .lesson-text-section p, .lesson-text-section li {
+            font-size: 1.1rem;
+            line-height: 1.5;
+            color: #374151;
+        }
+
+        .lesson-text-section ul {
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+
+        .lesson-text-section li {
+            margin-bottom: 8px;
+        }
+
+        /* Desktop square aspect ratio layout rules imported from demand.html */
+        #chart-wrapper {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1.45 / 1; 
+            position: relative;
+            touch-action: pan-y; 
+            margin-bottom: 5px;
+        }
+
+        /* Space-Saving Compact Live HUD beneath chart and above sliders */
+        .compact-hud-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+
+        /* --- DESKTOP FONT OVERRIDES --- */
+        .hud-status-badge {
+            text-align: center;
+            font-size: 1.6rem;
+            font-weight: 900;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .hud-row-metrics {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 10px 16px;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        .metric-item {
+            font-size: 1.75rem; 
+            font-weight: 900;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .metric-item span {
+            font-size: 1.1em;
+            background-color: #ffffff;
+            padding: 0 6px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .status-surplus { background-color: #fee2e2; color: var(--surplus-color); border: 1px solid #fca5a5; }
+        .status-shortage { background-color: #e0f2fe; color: var(--shortage-color); border: 1px solid #7dd3fc; }
+        .status-equilibrium { background-color: #dcfce7; color: var(--equilibrium-color); border: 1px solid #86efac; }
+
+        /* Responsive Mobile Layout Rules Toggle matched exactly from demand.html */
+        @media (max-width: 768px) {
+            body {
+                padding: 0;
+            }
+            .workspace-grid {
+                grid-template-columns: 1fr; 
+                padding: 12px;
+                border-radius: 0;
+                box-shadow: none;
+                gap: 12px;
+            }
+            .interactive-section {
+                order: 1; 
+            }
+            #chart-wrapper {
+                height: 45vh; 
+                aspect-ratio: auto;
+            }
+            .compact-hud-container {
+                margin-top: 2px;
+                gap: 6px;
+            }
+            /* --- MOBILE FONT OVERRIDES --- */
+            .hud-status-badge {
+                font-size: 1.35rem;
+                padding: 6px 8px;
+            }
+            .hud-row-metrics {
+                padding: 8px 10px;
+            }
+            .metric-item {
+                font-size: 1.25rem; 
+            }
+            .lesson-text-section {
+                order: 2; 
+                border-left: none;
+                border-top: 5px solid var(--primary);
+                padding: 15px;
+            }
+        }
+
+        /* Controls Panel Options Grid matched from demand.html */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 5px;
+            background: #f8fafc;
+            padding: 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+
+        .control-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .label-group label {
+            font-size: 1.2rem; 
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .slider-input-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+        }
+
+        /* Thick, Touch-Friendly Sliders from demand.html */
+        .thick-slider {
+            flex-grow: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 18px; 
+            border-radius: 9px;
+            background: #cbd5e1;
+            outline: none;
+        }
+
+        .thick-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+        }
+
+        .thick-slider::-moz-range-thumb {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+        }
+
+        /* Chunky Form Input Fields from demand.html */
+        .num-input {
+            width: 85px;
+            padding: 8px 4px;
+            font-size: 1.15rem; 
+            border: 2px solid #94a3b8;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 800;
+            color: var(--primary-dark);
+        }
+
+        .num-input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        /* Vector Graphic Styles Elements Rules from demand.html */
+        .axis-line {
+            stroke: #000000;
+            stroke-width: 4px;
+        }
+
+        .axis-text {
+            font-size: 19px; 
+            font-weight: bold;
+            fill: #000000;
+        }
+
+        .axis-label {
+            font-size: 19px; 
+            font-weight: 900;
+            fill: #1e293b;
+        }
+
+        .demand-line {
+            stroke: #dc2626;
+            stroke-width: 5px; 
+            stroke-linecap: round;
+        }
+
+        .supply-line {
+            stroke: #16a34a;
+            stroke-width: 5px;
+            stroke-linecap: round;
+        }
+
+        .price-tracker-line {
+            stroke: var(--primary);
+            stroke-width: 4px;
+        }
+
+        .price-tracker-hitbox {
+            stroke: transparent;
+            stroke-width: 26px;
+            cursor: ns-resize;
+            fill: none;
+        }
+
+        .projection-line {
+            stroke: #475569;
+            stroke-width: 4px; 
+            stroke-dasharray: 6,6;
+        }
+
+        .curve-dot {
+            cursor: ns-resize;
+        }
+
+        .demand-dot { fill: #dc2626; }
+        .supply-dot { fill: #16a34a; }
+
+        .dot-glow {
+            fill: var(--primary);
+            fill-opacity: 0.15;
+            cursor: ns-resize;
+        }
+
+        .disequilibrium-bar {
+            stroke-width: 8px;
+            stroke-linecap: round;
+            opacity: 0.85;
+        }
+
+        /* Baseline Reference Styles */
+        .reference-projection {
+            stroke: #94a3b8;
+            stroke-width: 3px;
+            stroke-dasharray: 5,5;
+            opacity: 1;
+        }
+
+        .reference-dot {
+            fill: #64748b;
+            opacity: 1;
+        }
+
+        .curve-label {
+            font-size: 24px;
+            font-weight: 900;
+            opacity: 0.95;
+        }
+
+        .equilibrium-label {
+            font-size: 24px;
+            font-weight: 900;
+            fill: #1e293b;
+            opacity: 1.0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="workspace-grid">
+    
+    <div class="interactive-section">
+        <div id="chart-wrapper"></div>
+
+        <div class="compact-hud-container">
+            <div id="hud-status" class="hud-status-badge status-equilibrium">Price is at Equilibrium</div>
+            <div class="hud-row-metrics">
+                <div class="metric-item" style="color: #dc2626;">Qd: <span id="hud-qd">5.0</span></div>
+                <div class="metric-item" style="color: #16a34a;">Qs: <span id="hud-qs">5.0</span></div>
+                <div class="metric-item" id="hud-gap-container" style="color: var(--text-main);">Gap: <span id="hud-gap">0.0</span></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-row">
+                <div class="label-group">
+                    <label for="price-slider">Market Price ($)</label>
+                </div>
+                <div class="slider-input-container">
+                    <input type="range" id="price-slider" class="thick-slider" min="0" max="20" step="0.1" value="10">
+                    <input type="number" id="price-input" class="num-input" min="0" max="20" step="0.1" value="10.0">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="lesson-text-section">
+        <h1>Market Equilibrium</h1>
+        <p>Market equilibrium occurs where the Demand curve intersects the Supply curve. Explore what happens when prices clear or deviate from equilibrium:</p>
+        
+        <p><strong>Interactive Guide:</strong></p>
+        <ul>
+            <li><strong>Drag the Price Line:</strong> Click/touch and move the horizontal blue line up or down directly on the graph to watch live adjustments.</li>
+            <li><strong>Use the Sliders:</strong> Drag the thick track slider directly beneath the graphics workspace to set precise pricing points.</li>
+        </ul>
+    </div>
+
+</div>
+
+<script>
+    const wrapper = d3.select("#chart-wrapper");
+    
+    function renderChart() {
+        wrapper.selectAll("*").remove();
+
+        const width = wrapper.node().getBoundingClientRect().width;
+        const height = wrapper.node().getBoundingClientRect().height;
+        const isMobile = window.innerWidth <= 768;
+
+        const margin = { 
+            top: 35, 
+            right: isMobile ? 25 : 45,  
+            bottom: 55, 
+            left: isMobile ? 45 : 45    
+        };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const svg = wrapper.append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%")
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("preserveAspectRatio", "xMidYMid meet");
+
+        const g = svg.append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // --- EQUATION SETUP MATRIX ---
+        function getQd(P) { return 10 - (P / 2); }
+        function getQs(P) { return P / 2; }
+
+        const xScale = d3.scaleLinear().domain([0, 10]).range([0, chartWidth]);
+        const yScale = d3.scaleLinear().domain([0, 20]).range([chartHeight, 0]);
+
+        g.append("line").attr("class", "axis-line").attr("x1", 0).attr("y1", chartHeight).attr("x2", chartWidth).attr("y2", chartHeight);
+        g.append("line").attr("class", "axis-line").attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", chartHeight);
+
+        const xTicks = d3.range(0, 11, 2);
+        const yTicks = d3.range(0, 21, 4);
+
+        g.selectAll(".x-tick").data(xTicks).enter().append("text")
+            .attr("class", "axis-text")
+            .attr("x", d => xScale(d))
+            .attr("y", chartHeight + 20) 
+            .attr("text-anchor", "middle")
+            .text(d => d);
+
+        g.selectAll(".y-tick").data(yTicks).enter().append("text")
+            .attr("class", "axis-text")
+            .attr("x", -8)              
+            .attr("y", d => yScale(d) + 6) 
+            .attr("text-anchor", "end")
+            .text(d => d);
+
+        g.append("text").attr("class", "axis-label").attr("x", chartWidth).attr("y", chartHeight + 40).attr("text-anchor", "end").text("Quantity (Q)");
+        g.append("text").attr("class", "axis-label").attr("y", -15).attr("x", 50).attr("text-anchor", "end").text("Price (P)");
+
+        // Render Static Demand Curve (Red)
+        g.append("line")
+            .attr("class", "demand-line")
+            .attr("x1", xScale(0)).attr("y1", yScale(20))
+            .attr("x2", xScale(10)).attr("y2", yScale(0));
+
+        // Render Static Supply Curve (Green)
+        g.append("line")
+            .attr("class", "supply-line")
+            .attr("x1", xScale(0)).attr("y1", yScale(0))
+            .attr("x2", xScale(10)).attr("y2", yScale(20));
+
+        // Demand Label "D" shifted safely to the bottom right end of the curve
+        g.append("text")
+            .attr("class", "curve-label")
+            .attr("x", xScale(9.5))
+            .attr("y", yScale(1))
+            .style("fill", "#dc2626")
+            .text("D");
+
+        // Supply Label "S" shifted safely to the right of the supply curve endpoint
+        g.append("text")
+            .attr("class", "curve-label")
+            .attr("x", xScale(9.8))
+            .attr("y", yScale(18.5))
+            .style("fill", "#16a34a")
+            .text("S");
+
+        // --- LOW OPACITY EQUILIBRIUM BASELINE LAYER ---
+        const eqPrice = 10;
+        const eqQuantity = 5;
+        const xEqPos = xScale(eqQuantity);
+        const yEqPos = yScale(eqPrice);
+
+        g.append("line")
+            .attr("class", "reference-projection")
+            .attr("x1", 0).attr("y1", yEqPos)
+            .attr("x2", xEqPos).attr("y2", yEqPos);
+
+        g.append("line")
+            .attr("class", "reference-projection")
+            .attr("x1", xEqPos).attr("y1", chartHeight)
+            .attr("x2", xEqPos).attr("y2", yEqPos);
+
+        g.append("circle")
+            .attr("class", "reference-dot")
+            .attr("cx", xEqPos)
+            .attr("cy", yEqPos)
+            .attr("r", 9);
+
+        // Positioned "E" comfortably above the dot to separate it from lines
+        g.append("text")
+            .attr("class", "equilibrium-label")
+            .attr("x", xEqPos - 8)
+            .attr("y", yEqPos - 18)
+            .text("E");
+
+        // --- LIVE TRACKING GEOMETRIES LAYER ---
+        const disequilibriumBar = g.append("line").attr("class", "disequilibrium-bar").style("fill", "none");
+        const demandVertLine = g.append("line").attr("class", "projection-line");
+        const supplyVertLine = g.append("line").attr("class", "projection-line");
+
+        const priceTrackerLine = g.append("line").attr("class", "price-tracker-line");
+        const priceTrackerHitbox = g.append("line").attr("class", "price-tracker-hitbox");
+
+        const dotRadius = Math.max(12, xScale(0.16) - xScale(0));
+        
+        const demandGlow = g.append("circle").attr("class", "dot-glow").attr("r", dotRadius * 1.8);
+        const demandDot = g.append("circle").attr("class", "curve-dot demand-dot").attr("r", dotRadius);
+
+        const supplyGlow = g.append("circle").attr("class", "dot-glow").attr("r", dotRadius * 1.8);
+        const supplyDot = g.append("circle").attr("class", "curve-dot supply-dot").attr("r", dotRadius);
+
+        function updateMarket(price, origin) {
+            price = Math.max(0, Math.min(20, price));
+            
+            let qd = getQd(price);
+            let qs = getQs(price);
+
+            let cy = yScale(price);
+            let cxDd = xScale(qd);
+            let cxSs = xScale(qs);
+
+            priceTrackerLine.attr("x1", 0).attr("y1", cy).attr("x2", chartWidth).attr("y2", cy);
+            priceTrackerHitbox.attr("x1", 0).attr("y1", cy).attr("x2", chartWidth).attr("y2", cy);
+
+            demandDot.attr("cx", cxDd).attr("cy", cy);
+            demandGlow.attr("cx", cxDd).attr("cy", cy);
+
+            supplyDot.attr("cx", cxSs).attr("cy", cy);
+            supplyGlow.attr("cx", cxSs).attr("cy", cy);
+
+            demandVertLine.attr("x1", cxDd).attr("y1", cy).attr("x2", cxDd).attr("y2", chartHeight);
+            supplyVertLine.attr("x1", cxSs).attr("y1", cy).attr("x2", cxSs).attr("y2", chartHeight);
+
+            d3.select("#hud-qd").text(qd.toFixed(1));
+            d3.select("#hud-qs").text(qs.toFixed(1));
+
+            const hudStatus = d3.select("#hud-status");
+            const hudGapContainer = d3.select("#hud-gap-container");
+            const hudGap = d3.select("#hud-gap");
+
+            if (price > 10.05) {
+                let surplus = qs - qd;
+                hudStatus.text("Market Price Too High (Surplus)").attr("class", "hud-status-badge status-surplus");
+                hudGapContainer.style("color", "var(--surplus-color)");
+                hudGap.text(`${surplus.toFixed(1)}`); 
+
+                disequilibriumBar.attr("x1", cxDd).attr("y1", cy).attr("x2", cxSs).attr("y2", cy).style("stroke", "var(--surplus-color)").style("display", "block");
+            } else if (price < 9.95) {
+                let shortage = qd - qs;
+                hudStatus.text("Market Price Too Low (Shortage)").attr("class", "hud-status-badge status-shortage");
+                hudGapContainer.style("color", "var(--shortage-color)");
+                hudGap.text(`${shortage.toFixed(1)}`); 
+
+                disequilibriumBar.attr("x1", cxSs).attr("y1", cy).attr("x2", cxDd).attr("y2", cy).style("stroke", "var(--shortage-color)").style("display", "block");
+            } else {
+                hudStatus.text("Price is at Equilibrium").attr("class", "hud-status-badge status-equilibrium");
+                hudGapContainer.style("color", "var(--equilibrium-color)");
+                hudGap.text("0.0");
+                disequilibriumBar.style("display", "none");
+            }
+
+            if (origin !== 'price-slider') d3.select("#price-slider").property("value", price);
+            if (origin !== 'price-input') d3.select("#price-input").property("value", parseFloat(price.toFixed(1)));
+        }
+
+        const dragBehavior = d3.drag()
+            .on("drag", function(event) {
+                let targetPrice = yScale.invert(event.y);
+                updateMarket(targetPrice, 'drag');
+            });
+
+        priceTrackerHitbox.call(dragBehavior);
+        demandDot.call(dragBehavior);
+        demandGlow.call(dragBehavior);
+        supplyDot.call(dragBehavior);
+        supplyGlow.call(dragBehavior);
+
+        d3.select("#price-slider").on("input", function() {
+            updateMarket(+this.value, 'price-slider');
+        });
+
+        d3.select("#price-input").on("input", function() {
+            let val = +this.value;
+            if (!isNaN(val)) updateMarket(val, 'price-input');
+        });
+
+        const initialPrice = +d3.select("#price-slider").property("value");
+        updateMarket(initialPrice, 'init');
+    }
+
+    renderChart();
+    window.addEventListener("resize", renderChart);
+</script>
+
+</body>
+</html>
